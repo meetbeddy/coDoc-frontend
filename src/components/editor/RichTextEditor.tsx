@@ -2,7 +2,7 @@ import React, { useMemo, useState, useCallback } from 'react';
 import { createEditor, Transforms, Editor as SlateEditor, Descendant, BaseEditor } from 'slate';
 import { Slate, Editable, withReact, useSlate, RenderElementProps, RenderLeafProps, ReactEditor } from 'slate-react';
 import { HistoryEditor, withHistory } from 'slate-history';
-import { FaBold, FaItalic, FaListUl, FaQuoteRight, FaHeading } from 'react-icons/fa';
+import { FaBold, FaItalic, FaListUl, FaQuoteRight, FaHeading, FaUnderline, FaStrikethrough, FaCode } from 'react-icons/fa';
 
 // custom types
 type ParagraphElement = { type: 'paragraph'; children: CustomText[] };
@@ -12,7 +12,15 @@ type ListItemElement = { type: 'list-item'; children: CustomText[] };
 type HeadingOneElement = { type: 'heading-one'; children: CustomText[] };
 
 type CustomElement = ParagraphElement | BlockquoteElement | BulletedListElement | ListItemElement | HeadingOneElement;
-type CustomText = { text: string; bold?: boolean; italic?: boolean };
+type CustomText = {
+    text: string;
+    bold?: boolean;
+    italic?: boolean;
+    underline?: boolean;
+    strikethrough?: boolean;
+    code?: boolean;
+};
+
 
 declare module 'slate' {
     interface CustomTypes {
@@ -39,6 +47,10 @@ const RichTextEditor: React.FC = () => {
                 <Toolbar>
                     <MarkButton format="bold" icon={<FaBold />} />
                     <MarkButton format="italic" icon={<FaItalic />} />
+                    <MarkButton format="underline" icon={<FaUnderline />} />
+                    <MarkButton format="strikethrough" icon={<FaStrikethrough />} />
+                    <MarkButton format="strikethrough" icon={<FaStrikethrough />} />
+                    <MarkButton format="code" icon={<FaCode />} />
                     <BlockButton format="bulleted-list" icon={<FaListUl />} />
                     <BlockButton format="blockquote" icon={<FaQuoteRight />} />
                     <BlockButton format="heading-one" icon={<FaHeading />} />
@@ -60,7 +72,7 @@ const Toolbar: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     return <div className="flex p-2 bg-gray-100 border-b border-gray-300">{children}</div>;
 };
 
-const MarkButton: React.FC<{ format: 'bold' | 'italic'; icon: React.ReactNode }> = ({ format, icon }) => {
+const MarkButton: React.FC<{ format: 'bold' | 'italic' | 'underline' | 'strikethrough' | 'code'; icon: React.ReactNode }> = ({ format, icon }) => {
     const editor = useSlate();
     return (
         <Button
@@ -89,6 +101,7 @@ const BlockButton: React.FC<{ format: 'blockquote' | 'bulleted-list' | 'heading-
         </Button>
     );
 };
+
 
 const Button: React.FC<{ active: boolean; onMouseDown: (event: React.MouseEvent) => void; children: React.ReactNode }> = ({ active, onMouseDown, children }) => {
     return (
@@ -124,15 +137,24 @@ const Leaf = ({ attributes, children, leaf }: RenderLeafProps) => {
     if (leaf.italic) {
         children = <em>{children}</em>;
     }
+    if (leaf.underline) {
+        children = <u>{children}</u>;
+    }
+    if (leaf.strikethrough) {
+        children = <del>{children}</del>;
+    }
+    if (leaf.code) {
+        children = <code>{children}</code>;
+    }
     return <span {...attributes}>{children}</span>;
 };
 
-const isMarkActive = (editor: SlateEditor, format: 'bold' | 'italic') => {
+const isMarkActive = (editor: SlateEditor, format: 'bold' | 'italic' | 'underline' | 'strikethrough' | 'code') => {
     const marks = SlateEditor.marks(editor);
     return marks ? marks[format] === true : false;
 };
 
-const toggleMark = (editor: SlateEditor, format: 'bold' | 'italic') => {
+const toggleMark = (editor: SlateEditor, format: 'bold' | 'italic' | 'underline' | 'strikethrough' | 'code') => {
     const isActive = isMarkActive(editor, format);
     if (isActive) {
         SlateEditor.removeMark(editor, format);
