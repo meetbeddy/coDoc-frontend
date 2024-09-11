@@ -162,6 +162,7 @@ const toggleBlock = (editor: SlateEditor, format: 'blockquote' | 'bulleted-list'
     const isActive = isBlockActive(editor, format);
     const isList = format === 'bulleted-list';
 
+    // Unwrap any existing lists
     Transforms.unwrapNodes(editor, {
         match: n =>
             !SlateEditor.isEditor(n) &&
@@ -170,22 +171,20 @@ const toggleBlock = (editor: SlateEditor, format: 'blockquote' | 'bulleted-list'
         split: true,
     });
 
+    // Define new block properties
     const newProperties: Partial<CustomElement> = {
         type: isActive ? 'paragraph' : isList ? 'list-item' : format,
     };
 
-    // Ensuring that we target only CustomElement nodes
-    Transforms.setNodes<CustomElement>(editor, newProperties, {
-        match: n => !SlateEditor.isEditor(n) && SlateEditor.isBlock(editor, n as CustomElement),
-    });
+    // Set the new block type
+    Transforms.setNodes<CustomElement>(editor, newProperties);
 
+    //  wrap the list items if we're activating a list
     if (!isActive && isList) {
-        const block = { type: format, children: [] };
-        Transforms.wrapNodes(editor, block, {
-            match: n => !SlateEditor.isEditor(n) && SlateEditor.isBlock(editor, n as CustomElement),
-        });
+        Transforms.wrapNodes(editor, { type: 'bulleted-list', children: [] });
     }
 };
+
 
 
 export default RichTextEditor;
