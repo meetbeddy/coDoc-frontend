@@ -1,5 +1,5 @@
-import RichTextEditor from "./components/editor/RichTextEditor"
 import Layout from "./layouts/Layout"
+import Editor from './components/editor/Index'
 
 
 
@@ -8,7 +8,7 @@ function App() {
 
   return (
     <Layout>
-      <RichTextEditor />
+      <Editor />
     </Layout>
   )
 }
