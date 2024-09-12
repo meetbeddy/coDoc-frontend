@@ -2,7 +2,7 @@ import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react'
 import { createEditor, Transforms, Editor as SlateEditor, Descendant, BaseEditor } from 'slate';
 import { Slate, Editable, withReact, useSlate, RenderElementProps, RenderLeafProps, ReactEditor } from 'slate-react';
 import { HistoryEditor, withHistory } from 'slate-history';
-import { FaBold, FaItalic, FaListUl, FaQuoteRight, FaHeading, FaUnderline, FaStrikethrough, FaCode, FaListOl, FaUndo, FaRedo } from 'react-icons/fa';
+import { FaBold, FaItalic, FaListUl, FaQuoteRight, FaHeading, FaUnderline, FaStrikethrough, FaCode, FaListOl, FaUndo, FaRedo, FaPaintBrush, FaHighlighter } from 'react-icons/fa';
 
 // custom types
 type ParagraphElement = { type: 'paragraph'; children: CustomText[] };
@@ -22,6 +22,8 @@ type CustomText = {
     underline?: boolean;
     strikethrough?: boolean;
     code?: boolean;
+    color?: string;
+    backgroundColor?: string;
 };
 
 
@@ -48,6 +50,7 @@ const RichTextEditor: React.FC = () => {
 
     const renderElement = useCallback((props: RenderElementProps) => <Element {...props} />, []);
     const renderLeaf = useCallback((props: RenderLeafProps) => <Leaf {...props} />, []);
+    const [activePicker, setActivePicker] = useState<string | null>(null);
     const handleKeyDown = useCallback((event: React.KeyboardEvent) => {
         if (!event.ctrlKey) return;
 
@@ -97,6 +100,19 @@ const RichTextEditor: React.FC = () => {
                     <MarkButton format="underline" icon={<FaUnderline />} shortcut="Ctrl+U" />
                     <MarkButton format="strikethrough" icon={<FaStrikethrough />} />
                     <MarkButton format="code" icon={<FaCode />} shortcut="Ctrl+`" />
+
+                    <ColorButton
+                        format="color"
+                        icon={<FaPaintBrush />}
+                        activePicker={activePicker}
+                        setActivePicker={setActivePicker}
+                    />
+                    <ColorButton
+                        format="backgroundColor"
+                        icon={<FaHighlighter />}
+                        activePicker={activePicker}
+                        setActivePicker={setActivePicker}
+                    />
                     <BlockButton format="bulleted-list" icon={<FaListUl />} />
                     <BlockButton format="numbered-list" icon={<FaListOl />} />
                     <BlockButton format="blockquote" icon={<FaQuoteRight />} />
@@ -136,7 +152,7 @@ const Tooltip: React.FC<{ content: string; children: React.ReactNode }> = ({ con
         if (isVisible && childRef.current) {
             const rect = childRef.current.getBoundingClientRect();
             setPosition({
-                top: rect.top - 40,
+                top: rect.top - 30,
                 left: rect.left + rect.width / 2,
             });
         }
@@ -218,10 +234,86 @@ const BlockButton: React.FC<{ format: RelevantBlockType; icon: React.ReactNode; 
     );
 };
 
+const ColorButton: React.FC<{
+    format: 'color' | 'backgroundColor';
+    icon: React.ReactNode;
+    activePicker: string | null;
+    setActivePicker: React.Dispatch<React.SetStateAction<string | null>>;
+}> = ({ format, icon, activePicker, setActivePicker }) => {
+    const editor = useSlate();
+    const pickerRef = useRef<HTMLDivElement>(null);
+
+    const colors = ['#000000', '#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF', '#808080'];
+
+    const isPickerOpen = activePicker === format;
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (pickerRef.current && !pickerRef.current.contains(event.target as Node)) {
+                setActivePicker('');
+            }
+        };
+
+        if (isPickerOpen) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [isPickerOpen, setActivePicker]);
+
+    return (
+        <div className="relative">
+            <Button
+                onMouseDown={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation(); // Prevent any unintended propagation
+
+                    // Toggle the color picker
+                    setActivePicker(isPickerOpen ? null : format);
+                }}
+                tooltip={format === 'color' ? 'Text Color' : 'Background Color'}
+            >
+                {icon}
+            </Button>
+
+            {isPickerOpen && (
+                <div
+                    ref={pickerRef}
+                    className="absolute w-44 z-10 p-2 bg-white border border-gray-300 rounded shadow-lg"
+                    style={{ top: '100%', left: '0' }}
+                    onMouseDown={(e) => e.stopPropagation()} // Prevent clicks inside the picker from closing it
+                >
+                    <div className="grid grid-cols-4 gap-1">
+                        {colors.map((color) => (
+                            <div
+                                key={color}
+                                className="w-6 h-6 cursor-pointer border border-gray-300 rounded-full"
+                                style={{ backgroundColor: color }}
+                                onMouseDown={(event) => {
+                                    event.preventDefault();
+                                    event.stopPropagation(); // Prevent closing the picker
+                                    toggleColor(editor, format, color);
+                                    setActivePicker(null); // Close picker after selection
+                                }}
+                            />
+                        ))}
+                    </div>
+                </div>
+            )}
+
+        </div>
+    );
+};
+
+
+
+
 
 const Button: React.FC<{
     active?: boolean;
-    onMouseDown: (event: React.MouseEvent) => void;
+    onMouseDown?: (event: React.MouseEvent) => void;
     children: React.ReactNode;
     tooltip?: string;
 }> = ({ active, onMouseDown, children, tooltip }) => {
@@ -263,6 +355,7 @@ const Element = ({ attributes, children, element }: RenderElementProps) => {
 };
 
 const Leaf = ({ attributes, children, leaf }: RenderLeafProps) => {
+    const style: React.CSSProperties = {};
     if (leaf.bold) {
         children = <strong>{children}</strong>;
     }
@@ -276,13 +369,15 @@ const Leaf = ({ attributes, children, leaf }: RenderLeafProps) => {
         children = <del>{children}</del>;
     }
     if (leaf.code) {
-        children = <code
-            className="bg-gray-200 text-blue-600 font-mono px-2 py-1 rounded text-sm"
-        >
-            {children}
-        </code>
+        children = <code className="bg-gray-200 text-blue-600 font-mono px-2 py-1 rounded text-sm">{children}</code>;
     }
-    return <span {...attributes}>{children}</span>;
+    if (leaf.color) {
+        style.color = leaf.color;
+    }
+    if (leaf.backgroundColor) {
+        style.backgroundColor = leaf.backgroundColor;
+    }
+    return <span {...attributes} style={style}>{children}</span>;
 };
 
 const isMarkActive = (editor: SlateEditor, format: keyof Omit<CustomText, 'text'>) => {
@@ -298,6 +393,24 @@ const toggleMark = (editor: SlateEditor, format: keyof Omit<CustomText, 'text'>)
         SlateEditor.addMark(editor, format, true);
     }
 };
+const toggleColor = (editor: SlateEditor, format: 'color' | 'backgroundColor', color: string) => {
+    const isActive = isColorActive(editor, format, color);
+    if (isActive) {
+        SlateEditor.removeMark(editor, format);
+    } else {
+        SlateEditor.addMark(editor, format, color);
+    }
+
+    const currentSelection = editor.selection;
+    Transforms.select(editor, currentSelection || []);
+};
+
+const isColorActive = (editor: SlateEditor, format: 'color' | 'backgroundColor', color: string) => {
+    const marks = SlateEditor.marks(editor);
+    return marks ? marks[format] === color : false;
+};
+
+
 
 const isBlockActive = (editor: SlateEditor, format: CustomElement['type']) => {
     const { selection } = editor;
