@@ -2,16 +2,19 @@ import React, { useMemo, useState, useCallback } from 'react';
 import { createEditor, Transforms, Editor as SlateEditor, Descendant, BaseEditor } from 'slate';
 import { Slate, Editable, withReact, useSlate, RenderElementProps, RenderLeafProps, ReactEditor } from 'slate-react';
 import { HistoryEditor, withHistory } from 'slate-history';
-import { FaBold, FaItalic, FaListUl, FaQuoteRight, FaHeading, FaUnderline, FaStrikethrough, FaCode } from 'react-icons/fa';
+import { FaBold, FaItalic, FaListUl, FaQuoteRight, FaHeading, FaUnderline, FaStrikethrough, FaCode, FaListOl, FaUndo, FaRedo } from 'react-icons/fa';
 
 // custom types
 type ParagraphElement = { type: 'paragraph'; children: CustomText[] };
 type BlockquoteElement = { type: 'blockquote'; children: CustomText[] };
 type BulletedListElement = { type: 'bulleted-list'; children: ListItemElement[] };
+type NumberedListElement = { type: 'numbered-list'; children: ListItemElement[] };
 type ListItemElement = { type: 'list-item'; children: CustomText[] };
 type HeadingOneElement = { type: 'heading-one'; children: CustomText[] };
+type HeadingTwoElement = { type: 'heading-two'; children: CustomText[] };
 
-type CustomElement = ParagraphElement | BlockquoteElement | BulletedListElement | ListItemElement | HeadingOneElement;
+
+type CustomElement = ParagraphElement | BlockquoteElement | BulletedListElement | NumberedListElement | ListItemElement | HeadingOneElement | HeadingTwoElement;
 type CustomText = {
     text: string;
     bold?: boolean;
@@ -20,6 +23,9 @@ type CustomText = {
     strikethrough?: boolean;
     code?: boolean;
 };
+
+type BlockType = CustomElement['type'];
+type RelevantBlockType = Exclude<BlockType, 'paragraph' | 'list-item'>;
 
 
 declare module 'slate' {
@@ -34,7 +40,7 @@ const RichTextEditor: React.FC = () => {
     const [value, setValue] = useState<Descendant[]>([
         {
             type: 'paragraph',
-            children: [{ text: 'Start typing here...' }],
+            children: [{ text: '' }],
         },
     ]);
 
@@ -45,15 +51,18 @@ const RichTextEditor: React.FC = () => {
         <Slate editor={editor} initialValue={value} onChange={newValue => setValue(newValue)}>
             <div className="border border-gray-300 rounded-md overflow-hidden">
                 <Toolbar>
+                    <HistoryButton format="undo" icon={<FaUndo />} />
+                    <HistoryButton format="redo" icon={<FaRedo />} />
                     <MarkButton format="bold" icon={<FaBold />} />
                     <MarkButton format="italic" icon={<FaItalic />} />
                     <MarkButton format="underline" icon={<FaUnderline />} />
                     <MarkButton format="strikethrough" icon={<FaStrikethrough />} />
-                    <MarkButton format="strikethrough" icon={<FaStrikethrough />} />
                     <MarkButton format="code" icon={<FaCode />} />
                     <BlockButton format="bulleted-list" icon={<FaListUl />} />
+                    <BlockButton format="numbered-list" icon={<FaListOl />} />
                     <BlockButton format="blockquote" icon={<FaQuoteRight />} />
                     <BlockButton format="heading-one" icon={<FaHeading />} />
+                    <BlockButton format="heading-two" icon={<FaHeading size={12} />} />
                 </Toolbar>
                 <Editable
                     renderElement={renderElement}
@@ -62,6 +71,12 @@ const RichTextEditor: React.FC = () => {
                     spellCheck
                     autoFocus
                     className="min-h-[200px] p-4"
+                    onKeyDown={(event) => {
+                        if (event.key === 'Tab') {
+                            event.preventDefault();
+                            editor.insertText('    ');
+                        }
+                    }}
                 />
             </div>
         </Slate>
@@ -69,10 +84,10 @@ const RichTextEditor: React.FC = () => {
 };
 
 const Toolbar: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    return <div className="flex p-2 bg-gray-100 border-b border-gray-300">{children}</div>;
+    return <div className="flex flex-wrap p-2 mb-0.5 bg-gray-100 border-b border-gray-300">{children}</div>;
 };
 
-const MarkButton: React.FC<{ format: 'bold' | 'italic' | 'underline' | 'strikethrough' | 'code'; icon: React.ReactNode }> = ({ format, icon }) => {
+const MarkButton: React.FC<{ format: keyof Omit<CustomText, 'text'>; icon: React.ReactNode }> = ({ format, icon }) => {
     const editor = useSlate();
     return (
         <Button
@@ -87,7 +102,22 @@ const MarkButton: React.FC<{ format: 'bold' | 'italic' | 'underline' | 'striketh
     );
 };
 
-const BlockButton: React.FC<{ format: 'blockquote' | 'bulleted-list' | 'heading-one'; icon: React.ReactNode }> = ({ format, icon }) => {
+const HistoryButton: React.FC<{ format: 'undo' | 'redo'; icon: React.ReactNode }> = ({ format, icon }) => {
+    const editor = useSlate();
+    return (
+        <Button
+            onMouseDown={event => {
+                event.preventDefault();
+                if (format === 'undo') editor.undo();
+                else editor.redo();
+            }}
+        >
+            {icon}
+        </Button>
+    );
+};
+
+const BlockButton: React.FC<{ format: RelevantBlockType; icon: React.ReactNode }> = ({ format, icon }) => {
     const editor = useSlate();
     return (
         <Button
@@ -103,7 +133,7 @@ const BlockButton: React.FC<{ format: 'blockquote' | 'bulleted-list' | 'heading-
 };
 
 
-const Button: React.FC<{ active: boolean; onMouseDown: (event: React.MouseEvent) => void; children: React.ReactNode }> = ({ active, onMouseDown, children }) => {
+const Button: React.FC<{ active?: boolean; onMouseDown: (event: React.MouseEvent) => void; children: React.ReactNode }> = ({ active, onMouseDown, children }) => {
     return (
         <span
             onMouseDown={onMouseDown}
@@ -121,10 +151,15 @@ const Element = ({ attributes, children, element }: RenderElementProps) => {
             return <blockquote {...attributes} className="border-l-4 border-gray-300 pl-4 italic">{children}</blockquote>;
         case 'bulleted-list':
             return <ul {...attributes} className="list-disc list-inside">{children}</ul>;
+        case 'numbered-list':
+            return <ol {...attributes} className="list-decimal list-inside">{children}</ol>;
         case 'heading-one':
             return <h1 {...attributes} className="text-2xl font-bold">{children}</h1>;
+        case 'heading-two':
+            return <h2 {...attributes} className="text-xl font-bold">{children}</h2>;
         case 'list-item':
             return <li {...attributes}>{children}</li>;
+
         default:
             return <p {...attributes}>{children}</p>;
     }
@@ -144,17 +179,21 @@ const Leaf = ({ attributes, children, leaf }: RenderLeafProps) => {
         children = <del>{children}</del>;
     }
     if (leaf.code) {
-        children = <code>{children}</code>;
+        children = <code
+            className="bg-gray-200 text-blue-600 font-mono px-2 py-1 rounded text-sm"
+        >
+            {children}
+        </code>
     }
     return <span {...attributes}>{children}</span>;
 };
 
-const isMarkActive = (editor: SlateEditor, format: 'bold' | 'italic' | 'underline' | 'strikethrough' | 'code') => {
+const isMarkActive = (editor: SlateEditor, format: keyof Omit<CustomText, 'text'>) => {
     const marks = SlateEditor.marks(editor);
     return marks ? marks[format] === true : false;
 };
 
-const toggleMark = (editor: SlateEditor, format: 'bold' | 'italic' | 'underline' | 'strikethrough' | 'code') => {
+const toggleMark = (editor: SlateEditor, format: keyof Omit<CustomText, 'text'>) => {
     const isActive = isMarkActive(editor, format);
     if (isActive) {
         SlateEditor.removeMark(editor, format);
@@ -163,7 +202,7 @@ const toggleMark = (editor: SlateEditor, format: 'bold' | 'italic' | 'underline'
     }
 };
 
-const isBlockActive = (editor: SlateEditor, format: 'blockquote' | 'bulleted-list' | 'heading-one') => {
+const isBlockActive = (editor: SlateEditor, format: CustomElement['type']) => {
     const { selection } = editor;
     if (!selection) return false;
 
@@ -180,9 +219,9 @@ const isBlockActive = (editor: SlateEditor, format: 'blockquote' | 'bulleted-lis
 };
 
 
-const toggleBlock = (editor: SlateEditor, format: 'blockquote' | 'bulleted-list' | 'heading-one') => {
+const toggleBlock = (editor: SlateEditor, format: CustomElement['type']) => {
     const isActive = isBlockActive(editor, format);
-    const isList = format === 'bulleted-list';
+    const isList = ['bulleted-list', 'numbered-list'].includes(format);
 
     // Unwrap any existing lists
     Transforms.unwrapNodes(editor, {
@@ -203,7 +242,9 @@ const toggleBlock = (editor: SlateEditor, format: 'blockquote' | 'bulleted-list'
 
     //  wrap the list items if we're activating a list
     if (!isActive && isList) {
-        Transforms.wrapNodes(editor, { type: 'bulleted-list', children: [] });
+        // Transforms.wrapNodes(editor, { type: 'bulleted-list', children: [] });
+        const block = { type: format, children: [] };
+        Transforms.wrapNodes(editor, block);
     }
 };
 
