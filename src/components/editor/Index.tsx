@@ -1,12 +1,10 @@
-import React, { useState } from 'react';
-import { Slate, Editable, } from 'slate-react';
+import React, { useState, useMemo } from 'react';
+import { Slate, Editable } from 'slate-react';
 import { Toolbar } from '../editor/ToolBar';
 import { useEditorConfig } from '../../hooks/useEditorConfig';
 import { FaExpandAlt, FaCompressAlt } from 'react-icons/fa';
 import { CustomText, CustomElement } from '../../types/editorTypes';
 import { Text, Element as SlateElement } from 'slate';
-
-
 
 type CustomDescendant = CustomElement | CustomText;
 
@@ -22,7 +20,7 @@ const RichTextEditor: React.FC = () => {
     const getWordCount = (nodes: CustomDescendant[]): number => {
         return nodes.reduce((count, node) => {
             if (Text.isText(node)) {
-                return count + node.text.split(/\s+/).length;
+                return count + node.text.trim().split(/\s+/).filter(Boolean).length;
             } else if (SlateElement.isElement(node)) {
                 return count + getWordCount(node.children);
             }
@@ -41,10 +39,14 @@ const RichTextEditor: React.FC = () => {
         }, 0);
     };
 
+    // Memoize word and character counts to prevent unnecessary recalculations
+    const wordCount = useMemo(() => getWordCount(value), [value]);
+    const characterCount = useMemo(() => getCharacterCount(value), [value]);
+
     return (
         <div className={`transition-all duration-300 ease-in-out ${isFullScreen ? 'fixed inset-0 z-50 bg-white' : 'relative'}`}>
             <Slate editor={editor} initialValue={value} onChange={newValue => setValue(newValue)}>
-                <div className={`flex flex-col h-full border border-gray-300 rounded-md overflow-hidden shadow-lg ${isFullScreen ? 'h-screen' : 'h-[600px]'}`}>
+                <div className={`flex flex-col h-full border border-gray-300 rounded-md overflow-hidden shadow-lg ${isFullScreen ? 'h-screen' : 'h-[calc(100vh-100px)]'}`}>
                     {/* Toolbar*/}
                     <div className="flex justify-between items-center bg-gray-100 border-b border-gray-300">
                         <Toolbar />
@@ -64,7 +66,7 @@ const RichTextEditor: React.FC = () => {
                             placeholder="Start typing here..."
                             spellCheck
                             autoFocus
-                            className="w-full h-full p-4 focus:outline-none"
+                            className="w-full h-full p-4 focus:outline-none max-w-full break-words whitespace-normal"
                             onKeyDown={(event) => {
                                 if (event.key === 'Tab') {
                                     event.preventDefault();
@@ -78,10 +80,10 @@ const RichTextEditor: React.FC = () => {
                     {/* Status bar */}
                     <div className="flex justify-between items-center px-4 py-2 bg-gray-100 border-t border-gray-300 text-sm text-gray-600">
                         <div>
-                            Words: {getWordCount(value)}
+                            Words: {wordCount}
                         </div>
                         <div>
-                            Characters: {getCharacterCount(value)}
+                            Characters: {characterCount}
                         </div>
                     </div>
                 </div>
