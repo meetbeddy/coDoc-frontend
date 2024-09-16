@@ -13,7 +13,7 @@ export const Toolbar: React.FC = () => {
 
   return (
     <div className="relative flex flex-wrap items-center w-full bg-gray-100 border-b border-gray-300 p-2">
-      <div className="flex items-center space-x-2 overflow-x-auto">
+      <div className="flex items-center space-x-2">
         {/* History Buttons Group */}
         <div className="flex items-center space-x-1 bg-white p-1 rounded-md shadow-sm">
           {HISTORY_BUTTONS.map((button) => (
@@ -25,7 +25,7 @@ export const Toolbar: React.FC = () => {
         <div className="w-px bg-gray-400 h-6 mx-2" />
 
         {/* Mark Buttons Group */}
-        <div className="flex items-center space-x-1 bg-white p-1 rounded-md shadow-sm">
+        <div className="flex items-center bg-white p-1 rounded-md shadow-sm">
           {MARK_BUTTONS.map((button) => (
             <MarkButton key={button.format} {...button} />
           ))}

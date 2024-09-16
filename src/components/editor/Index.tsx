@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { Slate, Editable } from 'slate-react';
 import { Toolbar } from '../editor/ToolBar';
 import { useEditorConfig } from '../../hooks/useEditorConfig';
@@ -17,7 +17,7 @@ const RichTextEditor: React.FC = () => {
         setIsFullScreen(!isFullScreen);
     };
 
-    const getWordCount = (nodes: CustomDescendant[]): number => {
+    const getWordCount = useCallback((nodes: CustomDescendant[]): number => {
         return nodes.reduce((count, node) => {
             if (Text.isText(node)) {
                 return count + node.text.trim().split(/\s+/).filter(Boolean).length;
@@ -26,9 +26,9 @@ const RichTextEditor: React.FC = () => {
             }
             return count;
         }, 0);
-    };
+    }, []);
 
-    const getCharacterCount = (nodes: CustomDescendant[]): number => {
+    const getCharacterCount = useCallback((nodes: CustomDescendant[]): number => {
         return nodes.reduce((count, node) => {
             if (Text.isText(node)) {
                 return count + node.text.length;
@@ -37,16 +37,16 @@ const RichTextEditor: React.FC = () => {
             }
             return count;
         }, 0);
-    };
+    }, []);
 
     // Memoize word and character counts to prevent unnecessary recalculations
-    const wordCount = useMemo(() => getWordCount(value), [value]);
-    const characterCount = useMemo(() => getCharacterCount(value), [value]);
+    const wordCount = useMemo(() => getWordCount(value), [getWordCount, value]);
+    const characterCount = useMemo(() => getCharacterCount(value), [getCharacterCount, value]);
 
     return (
         <div className={`transition-all duration-300 ease-in-out ${isFullScreen ? 'fixed inset-0 z-50 bg-white' : 'relative'}`}>
             <Slate editor={editor} initialValue={value} onChange={newValue => setValue(newValue)}>
-                <div className={`flex flex-col h-full border border-gray-300 rounded-md overflow-hidden shadow-lg ${isFullScreen ? 'h-screen' : 'h-[calc(100vh-100px)]'}`}>
+                <div className={`flex flex-col border border-gray-300 rounded-md overflow-hidden shadow-lg ${isFullScreen ? 'h-screen' : 'h-[calc(100vh-100px)]'}`}>
                     {/* Toolbar*/}
                     <div className="flex justify-between items-center bg-gray-100 border-b border-gray-300">
                         <Toolbar />
@@ -66,7 +66,7 @@ const RichTextEditor: React.FC = () => {
                             placeholder="Start typing here..."
                             spellCheck
                             autoFocus
-                            className="w-full h-full p-4 focus:outline-none max-w-full break-words whitespace-normal"
+                            style={editableStyles}
                             onKeyDown={(event) => {
                                 if (event.key === 'Tab') {
                                     event.preventDefault();
@@ -91,5 +91,15 @@ const RichTextEditor: React.FC = () => {
         </div>
     );
 };
+
+const editableStyles: React.CSSProperties = {
+    width: '100%',
+    height: '100%',
+    padding: '1rem',
+    outline: 'none',
+    maxWidth: '100%',
+    wordBreak: 'break-word',
+    whiteSpace: 'pre-wrap'
+}
 
 export default RichTextEditor;
